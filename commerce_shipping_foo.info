@@ -1,0 +1,6 @@
+name = Foo Shipping Method
+description = Foo toimitustapa
+package = RealuDev
+dependencies[] = commerce
+dependencies[] = commerce_shipping
+core = 7.x

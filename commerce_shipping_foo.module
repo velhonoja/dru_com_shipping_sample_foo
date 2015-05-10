@@ -1,0 +1,235 @@
+<?php
+
+/**
+ * @file
+ * Defines an example shipping method for testing and development.
+ */
+
+
+/**
+ * Implements hook_commerce_shipping_method_info().
+ */
+function commerce_shipping_foo_commerce_shipping_method_info() {
+  $shipping_methods = array();
+
+  $shipping_methods['foo_shipping_method'] = array(
+    'title' => t('Foo shipping method A'),
+    'description' => t('Foo shipping description A'),
+  );
+
+  return $shipping_methods;
+}
+
+/**
+ * Implements hook_commerce_shipping_service_info().
+ */
+function commerce_shipping_foo_commerce_shipping_service_info() {
+  $shipping_services = array();
+
+  $shipping_services['foo_shipping_service'] = array(
+    'title' => t('Foo shipping service B'),
+    'description' => t('Foo toimitus B'),
+    'display_title' => t('Foo display title B'),
+    'shipping_method' => 'foo_shipping_method',
+    'price_component' => 'shipping',
+    'callbacks' => array(
+      'rate' => 'commerce_shipping_foo_service_rate', // need to use this to add information about shipping method to commerce>order
+      'details_form' => 'commerce_shipping_foo_service_details_form',
+      'details_form_validate' => 'commerce_shipping_foo_service_details_form_validate',
+      'details_form_submit' => 'commerce_shipping_foo_service_details_form_submit',
+    ),
+  );
+
+  return $shipping_services;
+}
+
+/**
+ * Shipping service callback: returns a base price array for a shipping service
+ * calculated for the given order.
+ */
+function commerce_shipping_foo_service_rate($shipping_service, $order) {
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  return array(
+    'amount' => 0, // just set it to nothing for now
+    'currency_code' => $order_wrapper->commerce_order_total->currency_code->value(),
+    'data' => array(),
+  );
+}
+
+/**
+ * Shipping service callback: returns the example shipping service details form.
+ */
+function commerce_shipping_foo_service_details_form($pane_form, $pane_values, $checkout_pane, $order, $shipping_service) {
+  $form = array();
+
+  // what is the benefit of using this?
+  $pane_values['service_details'] += array(
+    'name' => '',
+  );
+
+  $form['name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Name'),
+    '#description' => t('This is a demonstration field coded to fail validation for single character values.'),
+    '#default_value' => $pane_values['service_details']['name'],
+    '#required' => TRUE,
+  );
+
+  return $form;
+}
+
+/**
+ * Shipping service callback: validates the example shipping service details.
+ */
+function commerce_shipping_foo_service_details_form_validate($details_form, $details_values, $shipping_service, $order, $form_parents) {
+  if (strlen($details_values['name']) < 2) {
+    form_set_error(implode('][', array_merge($form_parents, array('name'))), t('You must enter a name two or more characters long.'));
+
+    
+    // Even though the form error is enough to stop the submission of the form,
+    // it's not enough to stop it from a Commerce standpoint because of the
+    // combined validation / submission going on per-pane in the checkout form.
+    return FALSE;
+  }
+  
+    $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+    //dpm("SETTING VALUE TO ORDER!!!");
+    $order_wrapper->field_oma->set( $details_values['name'] ); // assumes that there is "field_oma" in order
+  
+}
+
+
+function commerce_shipping_foo_commerce_order_presave($order) {
+	
+	//checkout_review
+	$order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+	
+	dpm( $order_wrapper->commerce_line_items );
+	
+	foreach( $order_wrapper->commerce_line_items as $line_item_wrapper  ){
+		$line_item_type = $line_item_wrapper->type->value();
+		
+		//dpm( $line_item_type );
+		
+		if( $line_item_type == "shipping" ){
+			$shipping_service_name = $line_item_wrapper->commerce_shipping_service->value();
+			//dpm( $shipping_service_name );
+			
+			if( $shipping_service_name != "foo_shipping_service" ){
+				//dpm("SHIPPING METHOD CHANGED, CLEAR DATA!!");
+				//$order_wrapper->field_oma->set( "" );
+				$order->field_oma = array(); // empty array to clear data
+			}
+			
+		}
+		
+		//dpm( $line_item_wrapper );
+	}
+	
+	//dpm("commerce_shipping_foo_commerce_order_presave");
+	//dpm($order);
+}
+
+
+/**
+ * Helper function to check what is current shipping service name
+*/
+function check_what_is_shipping_service_name($order){
+	$order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+	
+	foreach( $order_wrapper->commerce_line_items as $line_item_wrapper  ){
+		$line_item_type = $line_item_wrapper->type->value();
+		
+		if( $line_item_type == "shipping" ){
+			return $line_item_wrapper->commerce_shipping_service->value();	
+		}
+	}
+	return FALSE;
+}
+
+
+
+/**
+ * Shipping service callback: increases the shipping line item's unit price if
+ * express delivery was selected.
+ */
+
+ function commerce_shipping_foo_service_details_form_submit($details_form, $details_values, $line_item) {
+ 	
+/*  if ($details_values['express']) {
+    $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+
+    // Build a price array for the express delivery fee.
+    $express_price = array(
+      'amount' => 1500,
+      'currency_code' => $line_item_wrapper->commerce_unit_price->currency_code->value(),
+      'data' => array(),
+    );
+
+    // Add the express upcharge to the line item unit price.
+    $line_item_wrapper->commerce_unit_price->amount = $line_item_wrapper->commerce_unit_price->amount->value() + 1500;
+
+    // Add the express delivery fee component to the unit price.
+    $line_item_wrapper->commerce_unit_price->data = commerce_price_component_add(
+      $line_item_wrapper->commerce_unit_price->value(),
+      'foo_shipping_service_express',
+      $express_price,
+      TRUE,
+      FALSE
+    );
+  }*/
+}
+
+/**
+ * Implements hook_commerce_price_component_type_info().
+ */
+ /*
+function commerce_shipping_foo_commerce_price_component_type_info() {
+  return array(
+    'foo_shipping_service_express' => array(
+      'title' => t('Express delivery'),
+      'weight' => 20,
+    ),
+  );
+}*/
+
+
+/**
+ * Add pane available to checkout-admin gui
+*/
+function commerce_shipping_foo_commerce_checkout_pane_info() {
+  $checkout_panes = array();
+
+  $checkout_panes['foo_shipping_info'] = array(
+    'title' => t('Foo Shipping info'),
+    //'file' => 'includes/commerce_checkout.checkout_pane.inc',
+    //'base' => 'commerce_checkout_review_pane',
+    'page' => 'review',
+    //'fieldset' => FALSE,
+    //'locked' => FALSE,
+	'callbacks' => array(
+		'checkout_form' => 'commerce_shipping_foo_pane_checkout_form',
+	),
+  );
+
+  return $checkout_panes;
+}
+
+
+/**
+ * Form to show at checkout
+ */
+function commerce_shipping_foo_pane_checkout_form($form, &$form_state, $checkout_pane, $order){
+	$order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+	$form = array();
+	
+	if( check_what_is_shipping_service_name($order) == "foo_shipping_service" ){
+		$form["foo_shipping_info1"] = array(
+								"#markup" => "The code is :" . $order_wrapper->field_oma->value()
+								);
+	}
+	
+	// it seems that if we return empty array, this pane is not shown at all, which is good
+	return $form;
+}
+
